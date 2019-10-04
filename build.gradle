@@ -1,0 +1,33 @@
+apply plugin: 'java'
+
+group = 'org.soraworld'
+version = '1.0.0'
+
+sourceCompatibility = targetCompatibility = 1.8
+
+repositories {
+    maven { url 'https://maven.aliyun.com/repository/public' }
+    maven { url 'https://hub.spigotmc.org/nexus/content/groups/public/' }
+    maven { url = 'https://oss.jfrog.org/artifactory/oss-release-local/' }
+    maven { url = 'https://oss.jfrog.org/artifactory/oss-snapshot-local/' }
+    maven { url = 'http://repo.extendedclip.com/content/repositories/placeholderapi/' }
+}
+
+dependencies {
+    compile 'org.soraworld:violet-spigot:2.4.3-SNAPSHOT'
+    compile 'org.spigotmc:spigot-api:1.12.2-R0.1-SNAPSHOT'
+    compile 'me.clip:placeholderapi:2.10.3'
+    compile files('lib/PlayerPoints.jar')
+}
+
+processResources {
+    inputs.property "version", project.version
+    from(sourceSets.main.resources.srcDirs) {
+        include 'plugin.yml'
+        expand 'version': project.version
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}

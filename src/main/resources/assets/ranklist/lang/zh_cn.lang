@@ -1,0 +1,8 @@
+# 中文语言文件(Chinese Language File)
+# 请使用 UTF-8 编码
+
+chatHead = "[排行榜] "
+
+rankHead = "------------排行榜------------"
+rankLine = "%2d - %-12s %10d"
+rankFoot = "-------------第 %d/%d 页-------------"

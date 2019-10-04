@@ -1,0 +1,13 @@
+name: RankList
+version: ${version}
+author: Himmelt
+main: org.soraworld.ranklist.RankList
+depend:
+  - Violet
+softdepend:
+  - PlaceholderAPI
+website: https://github.com/Himmelt/RankList
+description: RankList Plugin.
+permissions:
+  ranklist.admin:
+    default: op
