@@ -23,7 +23,7 @@ public final class CommandRank {
             Player player = Bukkit.getPlayer(args.first());
             if (player != null) {
                 try {
-                    RankManager.giveValue(player.getUniqueId(), args.get(1), Integer.parseInt(args.get(2)));
+                    manager.giveValue(player.getUniqueId(), args.get(1), Integer.parseInt(args.get(2)));
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
@@ -39,7 +39,7 @@ public final class CommandRank {
             Player player = Bukkit.getPlayer(args.first());
             if (player != null) {
                 try {
-                    RankManager.giveValue(player.getUniqueId(), args.get(1), -Integer.parseInt(args.get(2)));
+                    manager.giveValue(player.getUniqueId(), args.get(1), -Integer.parseInt(args.get(2)));
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
@@ -47,6 +47,11 @@ public final class CommandRank {
         } else {
             cmd.sendUsage(sender);
         }
+    };
+
+    @Sub(path = "save.rank", perm = "admin", usage = "/rank save rank")
+    public final SubExecutor save_rank = (cmd, sender, args) -> {
+        Bukkit.getScheduler().runTaskAsynchronously(manager.getPlugin(), manager::saveAllRank);
     };
 
     @Sub(usage = "/rank info <type> [page]")

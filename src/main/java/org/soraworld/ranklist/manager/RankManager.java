@@ -1,36 +1,28 @@
 package org.soraworld.ranklist.manager;
 
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.EntityType;
+import org.soraworld.hocon.node.FileNode;
+import org.soraworld.hocon.node.Node;
+import org.soraworld.hocon.node.NodeBase;
 import org.soraworld.hocon.node.Setting;
 import org.soraworld.ranklist.core.MonsterType;
-import org.soraworld.ranklist.core.PlayerInfo;
-import org.soraworld.violet.data.DataAPI;
 import org.soraworld.violet.inject.MainManager;
 import org.soraworld.violet.manager.VManager;
 import org.soraworld.violet.plugin.SpigotPlugin;
 import org.soraworld.violet.util.ChatColor;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
  * @author Himmelt
  */
 @MainManager
 public class RankManager extends VManager {
-
-/*杀怪排行榜
-boss击杀数量排行榜
-在线时间排行榜
-造成伤害排行榜
-*/
 
     @Setting
     private final HashSet<String> types = new HashSet<>();
@@ -44,8 +36,7 @@ boss击杀数量排行榜
     private static final String KILL_BOSS_KEY = "killBosses";
     private static final String DAMAGE_KEY = "damageAmount";
 
-    private static final ConcurrentSkipListSet<String> TYPES = new ConcurrentSkipListSet<>();
-    private static final ConcurrentHashMap<String, ConcurrentSkipListSet<PlayerInfo>> RANK_INFO_MAP = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, ConcurrentHashMap<UUID, Long>> PLAYER_INFO_MAP = new ConcurrentHashMap<>();
 
     public RankManager(SpigotPlugin plugin, Path path) {
         super(plugin, path);
@@ -57,9 +48,8 @@ boss击杀数量排行榜
         types.add(ONLINE_KEY);
         types.add(KILL_BOSS_KEY);
         types.add(DAMAGE_KEY);
-        TYPES.clear();
-        TYPES.addAll(types);
-        TYPES.forEach(typ -> RANK_INFO_MAP.putIfAbsent(typ, new ConcurrentSkipListSet<>()));
+        types.forEach(typ -> PLAYER_INFO_MAP.putIfAbsent(typ, new ConcurrentHashMap<>()));
+        loadAllRank();
     }
 
     @Override
@@ -67,26 +57,58 @@ boss击杀数量排行榜
         return ChatColor.YELLOW;
     }
 
-    public void loadOfflineInfo() {
-        OfflinePlayer[] offlinePlayers = Bukkit.getOfflinePlayers();
-        if (offlinePlayers != null && offlinePlayers.length > 0) {
-            for (OfflinePlayer op : offlinePlayers) {
-                System.out.println(op.getName());
-                UUID uuid = op.getUniqueId();
-                System.out.println(uuid);
-                for (String type : types) {
-                    System.out.println(type);
-                    long value = DataAPI.getStoreLong(uuid, "ranklist." + type);
-                    System.out.println(value);
-                    if (value > 0) {
-                        updateInfo(uuid, type, value);
+    public void loadAllRank() {
+        types.forEach(this::loadRank);
+    }
+
+    public void saveAllRank() {
+        types.forEach(this::saveRank);
+    }
+
+    public void loadRank(String type) {
+        if (types.contains(type)) {
+            Path path = getPath().resolve("rank_" + type + ".conf");
+            if (Files.notExists(path)) {
+                saveRank(type);
+                return;
+            }
+            FileNode node = new FileNode(path.toFile(), options);
+            try {
+                node.load(false);
+                ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.computeIfAbsent(type, typ -> new ConcurrentHashMap<>());
+                map.clear();
+                for (String uuid : node.keys()) {
+                    Node base = node.get(uuid);
+                    if (base instanceof NodeBase) {
+                        map.put(UUID.fromString(uuid), ((NodeBase) base).getLong());
                     }
+                }
+            } catch (Exception e) {
+                debug(e);
+                console(ChatColor.RED + "Rank " + type + " file load exception !!!");
+            }
+        }
+    }
+
+    public void saveRank(String type) {
+        if (types.contains(type)) {
+            ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.get(type);
+            if (map != null && map.size() > 0) {
+                FileNode node = new FileNode(getPath().resolve("rank_" + type + ".conf").toFile(), options);
+                for (Map.Entry<UUID, Long> entry : map.entrySet()) {
+                    node.add(entry.getKey().toString(), entry.getValue());
+                }
+                try {
+                    node.save();
+                } catch (Exception e) {
+                    debug(e);
+                    console(ChatColor.RED + "&cRank " + type + " file save exception !!!");
                 }
             }
         }
     }
 
-    public static void updateDamage(UUID uuid, MonsterType type, double damage, boolean kill) {
+    public void updateDamage(UUID uuid, MonsterType type, double damage, boolean kill) {
         if (kill) {
             if (type == MonsterType.BOSS) {
                 giveValue(uuid, KILL_BOSS_KEY, 1);
@@ -97,28 +119,15 @@ boss击杀数量排行榜
         giveValue(uuid, DAMAGE_KEY, Math.round(damage));
     }
 
-    public static void giveValue(UUID uuid, String type, long value) {
-        if (TYPES.contains(type)) {
-            long target = DataAPI.getStoreLong(uuid, "ranklist." + type) + value;
-            DataAPI.setStoreLong(uuid, "ranklist." + type, target);
-            updateInfo(uuid, type, target);
+    public void giveValue(UUID uuid, String type, long value) {
+        if (types.contains(type)) {
+            ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.computeIfAbsent(type, typ -> new ConcurrentHashMap<>());
+            long target = map.computeIfAbsent(uuid, uid -> 0L) + value;
+            map.put(uuid, target);
         }
     }
 
-    private static void updateInfo(UUID uuid, String type, long value) {
-        if (TYPES.contains(type)) {
-            ConcurrentSkipListSet<PlayerInfo> set = RANK_INFO_MAP.computeIfAbsent(type, typ -> new ConcurrentSkipListSet<>());
-            PlayerInfo info = new PlayerInfo(uuid, value);
-            boolean ok = set.remove(info);
-            System.out.println(ok);
-            set.add(info);
-            while (set.size() > 100) {
-                set.remove(set.last());
-            }
-        }
-    }
-
-    public static void updateGameTime(UUID uuid, long minutes) {
+    public void updateGameTime(UUID uuid, long minutes) {
         giveValue(uuid, ONLINE_KEY, minutes);
     }
 
@@ -136,19 +145,21 @@ boss击杀数量排行榜
         if (page < 1) {
             page = 1;
         }
-        ConcurrentSkipListSet<PlayerInfo> rank = RANK_INFO_MAP.get(type);
-        if (rank != null) {
-            Iterator<PlayerInfo> it = rank.iterator();
+        ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.get(type);
+        if (map != null) {
+            ArrayList<Map.Entry<UUID, Long>> list = new ArrayList<>(map.entrySet());
+            list.sort(Comparator.comparingLong(e -> -e.getValue()));
             sendKey(sender, "rankHead");
-            for (int i = 1; i <= page * 10 && it.hasNext(); i++) {
-                PlayerInfo info = it.next();
-                if (i >= page * 10 - 9) {
-                    sendKey(sender, "rankLine", i, info.getName(), info.getValue());
-                }
+            for (int i = (page - 1) * 10; i < page * 10 && i < list.size(); i++) {
+                Map.Entry<UUID, Long> entry = list.get(i);
+                UUID uuid = entry.getKey();
+                long value = entry.getValue();
+                String player = Bukkit.getOfflinePlayer(uuid).getName();
+                sendKey(sender, "rankLine", i + 1, player, value);
             }
-            sendKey(sender, "rankFoot", page, rank.size() / 10 + 1);
+            sendKey(sender, "rankFoot", page, list.size() / 10 + 1);
         } else {
-            send(sender, "          Rank for " + type + " NOT exist !!!");
+            send(sender, "     Rank for " + type + " NOT exist !!!");
         }
     }
 }
