@@ -27,7 +27,6 @@ public class RankManager extends VManager {
 
     @Setting
     private int lastCleanWeek = 0;
-
     @Setting
     private final HashSet<String> types = new HashSet<>();
     @Setting
@@ -54,11 +53,9 @@ public class RankManager extends VManager {
         types.add(DAMAGE_KEY);
         types.forEach(typ -> PLAYER_INFO_MAP.putIfAbsent(typ, new ConcurrentHashMap<>()));
         int week = DateUtils.getWeek(new Date(), +8);
-        if(week!=lastCleanWeek){
-            lastCleanWeek = week;
-            save();
-            saveAllRank();
-        }else{
+        if (week != lastCleanWeek) {
+            cleanAllRank();
+        } else {
             loadAllRank();
         }
     }
@@ -104,7 +101,7 @@ public class RankManager extends VManager {
     public void saveRank(String type) {
         if (types.contains(type)) {
             ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.get(type);
-            if (map != null && map.size() > 0) {
+            if (map != null) {
                 FileNode node = new FileNode(getPath().resolve("rank_" + type + ".conf").toFile(), options);
                 for (Map.Entry<UUID, Long> entry : map.entrySet()) {
                     node.add(entry.getKey().toString(), entry.getValue());
@@ -172,5 +169,13 @@ public class RankManager extends VManager {
         } else {
             send(sender, "     Rank for " + type + " NOT exist !!!");
         }
+    }
+
+    public void cleanAllRank() {
+        lastCleanWeek = DateUtils.getWeek(new Date(), +8);
+        PLAYER_INFO_MAP.values().forEach(ConcurrentHashMap::clear);
+        save();
+        saveAllRank();
+        consoleKey("cleanAll");
     }
 }

@@ -29,9 +29,7 @@ public class RankListener implements Listener {
         if (damager instanceof Player) {
             UUID uuid = damager.getUniqueId();
             double damage = event.getFinalDamage();
-            Bukkit.getScheduler().runTaskAsynchronously(manager.getPlugin(), () -> {
-                manager.updateDamage(uuid, manager.getMonsterType(damagee.getType()), damage, damage >= ((Creature) damagee).getHealth());
-            });
+            Bukkit.getScheduler().runTaskAsynchronously(manager.getPlugin(), () -> manager.updateDamage(uuid, manager.getMonsterType(damagee.getType()), damage, damage >= ((Creature) damagee).getHealth()));
         }
     }
 }

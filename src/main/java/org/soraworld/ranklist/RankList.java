@@ -6,9 +6,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.soraworld.ranklist.expansion.RankExpansion;
 import org.soraworld.ranklist.manager.RankManager;
+import org.soraworld.ranklist.util.DateUtils;
 import org.soraworld.violet.plugin.SpigotPlugin;
 import org.soraworld.violet.util.ChatColor;
 
+import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -43,6 +45,10 @@ public final class RankList extends SpigotPlugin<RankManager> {
                 System.out.println("updateGameTime");
             }
         }, 1, 1, TimeUnit.MINUTES);
+        int weekOfDay = DateUtils.getWeekDay(new Date(), +8);
+        timerService.scheduleAtFixedRate(() -> {
+            Bukkit.getScheduler().runTask(this, manager::cleanAllRank);
+        }, 7 - weekOfDay, 7, TimeUnit.DAYS);
     }
 
     @Override
