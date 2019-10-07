@@ -52,10 +52,7 @@ public class RankManager extends VManager {
         types.add(KILL_BOSS_KEY);
         types.add(DAMAGE_KEY);
         types.forEach(typ -> PLAYER_INFO_MAP.putIfAbsent(typ, new ConcurrentHashMap<>()));
-        int week = DateUtils.getWeek(new Date(), +8);
-        if (week != lastCleanWeek) {
-            cleanAllRank();
-        } else {
+        if (!tryCleanAllRank()) {
             loadAllRank();
         }
     }
@@ -171,11 +168,17 @@ public class RankManager extends VManager {
         }
     }
 
-    public void cleanAllRank() {
-        lastCleanWeek = DateUtils.getWeek(new Date(), +8);
-        PLAYER_INFO_MAP.values().forEach(ConcurrentHashMap::clear);
-        save();
-        saveAllRank();
-        consoleKey("cleanAll");
+    public boolean tryCleanAllRank() {
+        System.out.println("tryCleanAllRank");
+        int week = DateUtils.getWeek(new Date(), +8);
+        if (week != lastCleanWeek) {
+            lastCleanWeek = DateUtils.getWeek(new Date(), +8);
+            PLAYER_INFO_MAP.values().forEach(ConcurrentHashMap::clear);
+            save();
+            saveAllRank();
+            consoleKey("cleanAll");
+            return true;
+        }
+        return false;
     }
 }
