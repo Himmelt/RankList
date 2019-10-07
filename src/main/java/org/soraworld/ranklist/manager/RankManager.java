@@ -8,6 +8,7 @@ import org.soraworld.hocon.node.Node;
 import org.soraworld.hocon.node.NodeBase;
 import org.soraworld.hocon.node.Setting;
 import org.soraworld.ranklist.core.MonsterType;
+import org.soraworld.ranklist.util.DateUtils;
 import org.soraworld.violet.inject.MainManager;
 import org.soraworld.violet.manager.VManager;
 import org.soraworld.violet.plugin.SpigotPlugin;
@@ -23,6 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @MainManager
 public class RankManager extends VManager {
+
+    @Setting
+    private int lastCleanWeek = 0;
 
     @Setting
     private final HashSet<String> types = new HashSet<>();
@@ -49,7 +53,14 @@ public class RankManager extends VManager {
         types.add(KILL_BOSS_KEY);
         types.add(DAMAGE_KEY);
         types.forEach(typ -> PLAYER_INFO_MAP.putIfAbsent(typ, new ConcurrentHashMap<>()));
-        loadAllRank();
+        int week = DateUtils.getWeek(new Date(), +8);
+        if(week!=lastCleanWeek){
+            lastCleanWeek = week;
+            save();
+            saveAllRank();
+        }else{
+            loadAllRank();
+        }
     }
 
     @Override
