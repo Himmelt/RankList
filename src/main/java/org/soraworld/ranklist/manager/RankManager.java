@@ -8,6 +8,7 @@ import org.soraworld.hocon.node.Node;
 import org.soraworld.hocon.node.NodeBase;
 import org.soraworld.hocon.node.Setting;
 import org.soraworld.ranklist.core.MonsterType;
+import org.soraworld.ranklist.core.RankAward;
 import org.soraworld.ranklist.util.DateUtils;
 import org.soraworld.violet.inject.MainManager;
 import org.soraworld.violet.manager.VManager;
@@ -28,7 +29,7 @@ public class RankManager extends VManager {
     @Setting
     private int lastCleanWeek = 0;
     @Setting
-    private final HashSet<String> types = new HashSet<>();
+    private final HashMap<String, RankAward> types = new HashMap<>();
     @Setting
     private final HashSet<EntityType> bossTypes = new HashSet<>();
     @Setting
@@ -47,14 +48,12 @@ public class RankManager extends VManager {
 
     @Override
     public void afterLoad() {
-        types.add(KILL_MONSTER_KEY);
-        types.add(ONLINE_KEY);
-        types.add(KILL_BOSS_KEY);
-        types.add(DAMAGE_KEY);
-        types.forEach(typ -> PLAYER_INFO_MAP.putIfAbsent(typ, new ConcurrentHashMap<>()));
-        if (!tryCleanAllRank()) {
-            loadAllRank();
-        }
+        types.put(KILL_MONSTER_KEY, new RankAward());
+        types.put(ONLINE_KEY, new RankAward());
+        types.put(KILL_BOSS_KEY, new RankAward());
+        types.put(DAMAGE_KEY, new RankAward());
+        types.forEach((name, type) -> PLAYER_INFO_MAP.putIfAbsent(name, new ConcurrentHashMap<>()));
+        loadAllRank();
     }
 
     @Override
@@ -63,15 +62,15 @@ public class RankManager extends VManager {
     }
 
     public void loadAllRank() {
-        types.forEach(this::loadRank);
+        types.keySet().forEach(this::loadRank);
     }
 
     public void saveAllRank() {
-        types.forEach(this::saveRank);
+        types.keySet().forEach(this::saveRank);
     }
 
     public void loadRank(String type) {
-        if (types.contains(type)) {
+        if (types.containsKey(type)) {
             Path path = getPath().resolve("rank_" + type + ".conf");
             if (Files.notExists(path)) {
                 saveRank(type);
@@ -96,20 +95,22 @@ public class RankManager extends VManager {
     }
 
     public void saveRank(String type) {
-        if (types.contains(type)) {
-            ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.get(type);
-            if (map != null) {
-                FileNode node = new FileNode(getPath().resolve("rank_" + type + ".conf").toFile(), options);
-                for (Map.Entry<UUID, Long> entry : map.entrySet()) {
-                    node.add(entry.getKey().toString(), entry.getValue());
+        if (types.containsKey(type)) {
+            Bukkit.getScheduler().runTaskAsynchronously(getPlugin(), () -> {
+                ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.get(type);
+                if (map != null) {
+                    FileNode node = new FileNode(getPath().resolve("rank_" + type + ".conf").toFile(), options);
+                    for (Map.Entry<UUID, Long> entry : map.entrySet()) {
+                        node.add(entry.getKey().toString(), entry.getValue());
+                    }
+                    try {
+                        node.save();
+                    } catch (Exception e) {
+                        debug(e);
+                        console(ChatColor.RED + "&cRank " + type + " file save exception !!!");
+                    }
                 }
-                try {
-                    node.save();
-                } catch (Exception e) {
-                    debug(e);
-                    console(ChatColor.RED + "&cRank " + type + " file save exception !!!");
-                }
-            }
+            });
         }
     }
 
@@ -125,7 +126,7 @@ public class RankManager extends VManager {
     }
 
     public void giveValue(UUID uuid, String type, long value) {
-        if (types.contains(type)) {
+        if (types.containsKey(type)) {
             ConcurrentHashMap<UUID, Long> map = PLAYER_INFO_MAP.computeIfAbsent(type, typ -> new ConcurrentHashMap<>());
             long target = map.computeIfAbsent(uuid, uid -> 0L) + value;
             map.put(uuid, target);
@@ -168,17 +169,20 @@ public class RankManager extends VManager {
         }
     }
 
-    public boolean tryCleanAllRank() {
+    public void tryCleanAllRank() {
         System.out.println("tryCleanAllRank");
         int week = DateUtils.getWeek(new Date(), +8);
         if (week != lastCleanWeek) {
-            lastCleanWeek = DateUtils.getWeek(new Date(), +8);
+            lastCleanWeek = week;
+            sendRewards();
             PLAYER_INFO_MAP.values().forEach(ConcurrentHashMap::clear);
-            save();
+            asyncSave(Bukkit.getConsoleSender());
             saveAllRank();
             consoleKey("cleanAll");
-            return true;
         }
-        return false;
+    }
+
+    public void sendRewards() {
+        // TODO
     }
 }

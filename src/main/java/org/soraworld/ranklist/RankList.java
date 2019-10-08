@@ -43,7 +43,8 @@ public final class RankList extends SpigotPlugin<RankManager> {
             }
             System.out.println("updateGameTime");
         }, 1, 5, TimeUnit.MINUTES);
-        timerService.scheduleAtFixedRate(manager::tryCleanAllRank, 1, 1, TimeUnit.MINUTES);
+        Bukkit.getScheduler().runTaskTimer(this, manager::tryCleanAllRank, 0, 30 * 60 * 20);
+        //timerService.scheduleAtFixedRate(manager::tryCleanAllRank, 0, 30, TimeUnit.MINUTES);
     }
 
     @Override
